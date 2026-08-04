@@ -185,7 +185,7 @@ export async function validateDeck(decklist, format = 'commander') {
     other_cards = cards;
   }
 
-  return apiPost('/deck', {
+return apiPost('/deck', {
   commander_names: commander_names.map(name => ({
     name
   })),
@@ -194,3 +194,4 @@ export async function validateDeck(decklist, format = 'commander') {
   })),
   format
 });
+}
