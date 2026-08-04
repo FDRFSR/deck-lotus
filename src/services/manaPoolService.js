@@ -149,6 +149,45 @@ export async function optimizeCart(items, model = 'lowest_price') {
 // decklist: plain-text list, e.g. "1 Sol Ring\n1 Atraxa..."
 // format: 'commander' | 'standard' | 'modern' | etc.
 export async function validateDeck(decklist, format = 'commander') {
-  if (!isConfigured()) throw new Error('Mana Pool API token not configured (MANAPOOL_API_TOKEN missing)');
-  return apiPost('/deck', { decklist, format });
+  if (!isConfigured()) {
+    throw new Error('Mana Pool API token not configured (MANAPOOL_API_TOKEN missing)');
+  }
+
+  const lines = decklist
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const cards = lines.map(line => {
+    // rimuove quantità iniziale: "4 Lightning Bolt" -> "Lightning Bolt"
+    return line.replace(/^\d+x?\s+/i, '');
+  });
+
+  let commander_names = [];
+  let other_cards = [];
+
+  if (format === 'commander') {
+    // Cerca il comandante marcato eventualmente come "Commander:"
+    const commanderLine = lines.find(line =>
+      line.toLowerCase().includes('commander:')
+    );
+
+    if (commanderLine) {
+      commander_names.push(
+        commanderLine.replace(/^.*commander:\s*/i, '')
+      );
+    }
+
+    other_cards = cards.filter(card =>
+      !commander_names.includes(card)
+    );
+  } else {
+    other_cards = cards;
+  }
+
+  return apiPost('/deck', {
+    commander_names,
+    other_cards,
+    format
+  });
 }
