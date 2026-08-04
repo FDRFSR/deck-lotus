@@ -158,40 +158,59 @@ export async function validateDeck(decklist, format = 'commander') {
     .map(line => line.trim())
     .filter(Boolean);
 
+  // Converti ogni riga in { name, quantity }
   const cards = lines.map(line => {
-    // rimuove quantità iniziale: "4 Lightning Bolt" -> "Lightning Bolt"
-    return line.replace(/^\d+x?\s+/i, '');
+    const match = line.match(/^(\d+)x?\s+(.+)$/i);
+
+    if (match) {
+      return {
+        name: match[2].trim(),
+        quantity: Number(match[1])
+      };
+    }
+
+    return {
+      name: line,
+      quantity: 1
+    };
   });
 
   let commander_names = [];
-  let other_cards = [];
+  let other_cards = cards;
 
-  if (format === 'commander') {
-    // Cerca il comandante marcato eventualmente come "Commander:"
+  if (format.toLowerCase() === 'commander') {
+    // Cerca una riga tipo:
+    // Commander: Atraxa, Praetors' Voice
     const commanderLine = lines.find(line =>
-      line.toLowerCase().includes('commander:')
+      line.toLowerCase().startsWith('commander:')
     );
 
     if (commanderLine) {
-      commander_names.push(
-        commanderLine.replace(/^.*commander:\s*/i, '')
+      const commanderName = commanderLine
+        .replace(/^commander:\s*/i, '')
+        .trim();
+
+      commander_names.push({
+        name: commanderName,
+        quantity: 1
+      });
+
+      other_cards = cards.filter(card =>
+        card.name.toLowerCase() !== commanderName.toLowerCase()
       );
     }
-
-    other_cards = cards.filter(card =>
-      !commander_names.includes(card)
-    );
-  } else {
-    other_cards = cards;
   }
 
-return apiPost('/deck', {
-  commander_names: commander_names.map(name => ({
-    name
-  })),
-  other_cards: other_cards.map(name => ({
-    name
-  })),
-  format
-});
+  const body = {
+    commander_names,
+    other_cards,
+    format
+  };
+
+  console.log(
+    'Mana Pool /deck request:',
+    JSON.stringify(body, null, 2)
+  );
+
+  return apiPost('/deck', body);
 }
