@@ -26,8 +26,8 @@ services:
       # ── Mana Pool API (required for price monitoring & cart optimizer) ─────
       # Generate your token at: https://manapool.com/seller/settings/integrations
       # Both your account email and API token are required.
-      - MANAPOOL_USER_EMAIL=${MANAPOOL_USER_EMAIL:}
-      - MANAPOOL_API_TOKEN=${MANAPOOL_API_TOKEN:}
+      - MANAPOOL_USER_EMAIL=${MANAPOOL_USER_EMAIL:-}
+      - MANAPOOL_API_TOKEN=${MANAPOOL_API_TOKEN:-}
 
       # ── TCGPlayer API (optional fallback — keys no longer publicly issued) ──
       - TCGPLAYER_CLIENT_ID=${TCGPLAYER_CLIENT_ID:-}
