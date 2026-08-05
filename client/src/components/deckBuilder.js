@@ -1653,42 +1653,58 @@ function exportToManapool() {
 }
 
 function generateExport(format) {
-  const mainboard = currentDeck.cards.filter(isMainboardCard);
+  // Il comandante NON deve mai comparire nel mainboard/deck principale:
+  // va sempre estratto e trattato a parte, indipendentemente dal formato.
+  const allMainboard = currentDeck.cards.filter(isMainboardCard);
+  const commander = allMainboard.find(c => c.is_commander) || null;
+  const mainboard = allMainboard.filter(c => !c.is_commander);
   const sideboard = currentDeck.cards.filter(isSideboardCard);
 
   let text = '';
 
   switch (format) {
-    case 'moxfield':
+    case 'moxfield': {
       // Format: 1 Card Name (SET) collector_number *F* (for foil)
-      text = mainboard.map(c => {
+      const formatLine = (c) => {
         let line = `${c.quantity} ${c.name} (${c.set_code.toUpperCase()}) ${c.collector_number || ''}`;
         if (c.finishes && c.finishes.includes('foil')) line += ' *F*';
         return line.trim();
-      }).join('\n');
+      };
+
+      const deckLines = mainboard.map(formatLine).join('\n');
+
+      if (commander) {
+        // Moxfield si aspetta esattamente:
+        // Commander
+        // 1 Nome Comandante
+        //
+        // Deck
+        // ...99 carte...
+        text = `Commander\n${formatLine(commander)}\n\nDeck\n${deckLines}`;
+      } else {
+        text = deckLines;
+      }
+
       if (sideboard.length > 0) {
-        text += '\n\n';
-        text += sideboard.map(c => {
-          let line = `${c.quantity} ${c.name} (${c.set_code.toUpperCase()}) ${c.collector_number || ''}`;
-          if (c.finishes && c.finishes.includes('foil')) line += ' *F*';
-          return line.trim();
-        }).join('\n');
+        text += '\n\nSideboard\n';
+        text += sideboard.map(formatLine).join('\n');
       }
       break;
+    }
 
     case 'arena':
     case 'mtgo':
-    case 'text':
-      // Simple format: quantity name
-      text = 'Deck\n' + mainboard.map(c => `${c.quantity} ${c.name}`).join('\n');
+    case 'text': {
+      let deckText = 'Deck\n' + mainboard.map(c => `${c.quantity} ${c.name}`).join('\n');
       if (sideboard.length > 0) {
-        text += '\n\n' + sideboard.map(c => `${c.quantity} ${c.name}`).join('\n');
+        deckText += '\n\n' + sideboard.map(c => `${c.quantity} ${c.name}`).join('\n');
       }
-      if (currentDeck.cards.find(c => c.is_commander)) {
-        const commander = currentDeck.cards.find(c => c.is_commander);
-        text = `Commander\n1 ${commander.name}\n\n` + text;
+      if (commander) {
+        deckText = `Commander\n1 ${commander.name}\n\n` + deckText;
       }
+      text = deckText;
       break;
+    }
   }
 
   return text;
