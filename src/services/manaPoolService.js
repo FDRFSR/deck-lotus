@@ -157,22 +157,25 @@ export async function validateDeck(decklist, format = 'commander') {
     .filter(Boolean);
 
 
-  // Estrae quantità e nome carta
-  const parsedCards = lines.map(line => {
-    const match = line.match(/^(\d+)x?\s+(.+)$/i);
+  // Parsing quantità + nome carta
+  const parsedCards = lines
+    .filter(line => !/^sideboard:/i.test(line))
+    .map(line => {
 
-    if (match) {
+      const match = line.match(/^(\d+)x?\s+(.+)$/i);
+
+      if (match) {
+        return {
+          name: match[2].trim(),
+          quantity: Number(match[1])
+        };
+      }
+
       return {
-        name: match[2].trim(),
-        quantity: Number(match[1])
+        name: line.trim(),
+        quantity: 1
       };
-    }
-
-    return {
-      name: line.trim(),
-      quantity: 1
-    };
-  });
+    });
 
 
   let commander_names = [];
@@ -181,25 +184,45 @@ export async function validateDeck(decklist, format = 'commander') {
 
   if (format.toLowerCase() === 'commander') {
 
-    // Cerca la riga:
-    // Commander: Nome Commander
+
+    // Cerca comandante dichiarato:
+    // Commander: Atraxa, Praetors' Voice
     const commanderLine = lines.find(line =>
       /^commander:/i.test(line)
     );
 
 
     if (commanderLine) {
+
       const commanderName = commanderLine
         .replace(/^commander:\s*/i, '')
         .trim();
 
-      // ATTENZIONE:
-      // deve essere una stringa, NON un oggetto
       commander_names.push(commanderName);
+
     }
 
 
-    // Tutte le altre carte vanno in other_cards
+    /*
+      Se non trova Commander:
+      prova a prendere una riga singola
+      prima delle carte normali
+    */
+    if (commander_names.length === 0) {
+
+      const firstCard = parsedCards[0];
+
+      if (
+        firstCard &&
+        !/^\d+x?\s+/i.test(lines[0])
+      ) {
+        commander_names.push(firstCard.name);
+      }
+
+    }
+
+
+    // Rimuove solo il commander dalle altre carte
     other_cards = parsedCards.filter(card =>
       !commander_names.includes(card.name)
     );
@@ -213,9 +236,16 @@ export async function validateDeck(decklist, format = 'commander') {
 
 
   const body = {
+
+    // Mana Pool vuole string[]
     commander_names,
+
+    // Mana Pool vuole:
+    // { name: string, quantity:number }
     other_cards,
+
     format
+
   };
 
 
