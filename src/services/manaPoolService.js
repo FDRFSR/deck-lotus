@@ -145,7 +145,6 @@ export async function optimizeCart(items, model = 'lowest_price') {
   return apiPost('/buyer/optimizer', body);
 }
 
-// POST /deck — validate a deck for a given format
 export async function validateDeck(decklist, format = 'commander') {
   if (!isConfigured()) {
     throw new Error('Mana Pool API token not configured (MANAPOOL_API_TOKEN missing)');
@@ -156,80 +155,114 @@ export async function validateDeck(decklist, format = 'commander') {
     .map(line => line.trim())
     .filter(Boolean);
 
-
-  // Mantiene quantità e nome carta
-  const parsedCards = lines.map(line => {
-    const match = line.match(/^(\d+)x?\s+(.+)$/i);
-
-    if (match) {
-      return {
-        name: match[2].trim(),
-        quantity: Number(match[1])
-      };
-    }
-
-    return {
-      name: line.trim(),
-      quantity: 1
-    };
+  // Rimuove quantità iniziale e gestisce carte doppia faccia
+  // Esempio:
+  // "1 Joshua, Phoenix's Dominant // Phoenix, Warden of Fire"
+  // diventa:
+  // "Joshua, Phoenix's Dominant"
+  const cards = lines.map(line => {
+    return line
+      .replace(/^\d+x?\s+/i, '')
+      .split('//')[0]
+      .trim();
   });
-
 
   let commander_names = [];
   let other_cards = [];
 
+  if (format === 'commander') {
 
-  if (format.toLowerCase() === 'commander') {
+    /*
+      Cerca il comandante nei formati:
 
-    // Cerca:
-    // Commander: Atraxa, Praetors' Voice
-    const commanderLine = lines.find(line =>
-      /^commander:/i.test(line)
+      Commander:
+      Hofri Ghostforge
+
+      oppure:
+
+      Commander: Hofri Ghostforge
+
+    */
+
+    const commanderIndex = lines.findIndex(line =>
+      line.toLowerCase().startsWith('commander')
     );
 
 
-    if (commanderLine) {
-      const commanderName = commanderLine
-        .replace(/^commander:\s*/i, '')
+    if (commanderIndex !== -1) {
+
+      let commanderLine = lines[commanderIndex]
+        .replace(/^commander[:\s]*/i, '')
         .trim();
 
-      commander_names.push(commanderName);
+
+      // Caso:
+      // Commander:
+      // Hofri Ghostforge
+      if (!commanderLine && lines[commanderIndex + 1]) {
+        commanderLine = lines[commanderIndex + 1]
+          .replace(/^\d+x?\s+/i, '')
+          .split('//')[0]
+          .trim();
+      }
+
+
+      if (commanderLine) {
+        commander_names.push(commanderLine);
+      }
+
     }
 
 
-    other_cards = parsedCards.filter(card =>
-      !commander_names.includes(card.name)
-    );
+    /*
+      Fallback:
+      se non trova Commander:
+      prende la prima carta come comandante.
+
+      Serve perché molte decklist esportate
+      non hanno il tag Commander.
+    */
+
+    if (commander_names.length === 0 && cards.length > 0) {
+
+      commander_names.push(cards[0]);
+
+      other_cards = cards.slice(1);
+
+    } else {
+
+      other_cards = cards.filter(card =>
+        !commander_names.includes(card)
+      );
+
+    }
 
 
   } else {
 
-    other_cards = parsedCards;
+    other_cards = cards;
 
   }
 
 
-  const body = {
-    commander_names,
-    other_cards,
+  const payload = {
+    commander_names: commander_names.map(name => ({
+      name
+    })),
+
+    other_cards: other_cards.map(name => ({
+      name
+    })),
+
     format
   };
 
 
   console.log(
-    "Mana Pool /deck REQUEST:",
-    JSON.stringify(body, null, 2)
+    'Mana Pool /deck FINAL PAYLOAD:',
+    JSON.stringify(payload, null, 2)
   );
 
 
-  const result = await apiPost('/deck', body);
-
-
-  console.log(
-    "Mana Pool /deck RESPONSE:",
-    JSON.stringify(result, null, 2)
-  );
-
-
-  return result;
+  return apiPost('/deck', payload);
 }
