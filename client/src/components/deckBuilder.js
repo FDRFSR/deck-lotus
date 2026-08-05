@@ -1620,9 +1620,49 @@ function exportToTCGPlayer() {
   }
 }
 
+// Nuova funzione dedicata all'export verso Mana Pool: a differenza di
+// generateDeckList() (usata da TCGPlayer), qui il comandante va SEMPRE
+// estratto dal mainboard e stampato nella sua sezione dedicata, altrimenti
+// finisce mescolato alle altre 99 carte e Mana Pool non lo riconosce come tale.
+function generateManapoolDeckList() {
+  const nonOwnedOnly = document.getElementById('copy-non-owned-only')?.checked || false;
+
+  const allMainboard = currentDeck.cards.filter(isMainboardCard);
+  const commander = allMainboard.find(c => c.is_commander) || null;
+
+  let mainboardCards = allMainboard.filter(c => !c.is_commander);
+  let sideboardCards = currentDeck.cards.filter(isSideboardCard);
+
+  if (nonOwnedOnly) {
+    mainboardCards = mainboardCards.filter(c => !c.is_owned);
+    sideboardCards = sideboardCards.filter(c => !c.is_owned);
+    // Il comandante resta sempre visibile nell'export anche in modalità
+    // "solo non possedute": senza comandante il mazzo non è più valido/importabile.
+  }
+
+  const formatLine = (c) => `${c.quantity} ${c.name} [${c.set_code}]`;
+
+  const mainboard = mainboardCards.map(formatLine).join('\n');
+  const sideboard = sideboardCards.map(formatLine).join('\n');
+
+  let deckText = '';
+
+  if (commander) {
+    deckText += `Commander\n${formatLine(commander)}\n\nDeck\n`;
+  }
+
+  deckText += mainboard;
+
+  if (sideboard) {
+    deckText += '\n\nSideboard\n' + sideboard;
+  }
+
+  return deckText;
+}
+
 function exportToManapool() {
   try {
-    const deckText = generateDeckList();
+    const deckText = generateManapoolDeckList();
 
     if (!deckText.trim()) {
       const nonOwnedOnly = document.getElementById('copy-non-owned-only')?.checked || false;
