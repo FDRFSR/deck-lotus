@@ -146,8 +146,6 @@ export async function optimizeCart(items, model = 'lowest_price') {
 }
 
 // POST /deck — validate a deck for a given format
-// decklist: plain-text list, e.g. "1 Sol Ring\n1 Atraxa..."
-// format: 'commander' | 'standard' | 'modern' | etc.
 export async function validateDeck(decklist, format = 'commander') {
   if (!isConfigured()) {
     throw new Error('Mana Pool API token not configured (MANAPOOL_API_TOKEN missing)');
@@ -158,8 +156,9 @@ export async function validateDeck(decklist, format = 'commander') {
     .map(line => line.trim())
     .filter(Boolean);
 
-  // Converti ogni riga in { name, quantity }
-  const cards = lines.map(line => {
+
+  // Mantiene quantità e nome carta
+  const parsedCards = lines.map(line => {
     const match = line.match(/^(\d+)x?\s+(.+)$/i);
 
     if (match) {
@@ -170,36 +169,45 @@ export async function validateDeck(decklist, format = 'commander') {
     }
 
     return {
-      name: line,
+      name: line.trim(),
       quantity: 1
     };
   });
 
+
   let commander_names = [];
-  let other_cards = cards;
+  let other_cards = [];
+
 
   if (format.toLowerCase() === 'commander') {
-    // Cerca una riga tipo:
+
+    // Cerca:
     // Commander: Atraxa, Praetors' Voice
     const commanderLine = lines.find(line =>
-      line.toLowerCase().startsWith('commander:')
+      /^commander:/i.test(line)
     );
+
 
     if (commanderLine) {
       const commanderName = commanderLine
         .replace(/^commander:\s*/i, '')
         .trim();
 
-      commander_names.push({
-        name: commanderName,
-        quantity: 1
-      });
-
-      other_cards = cards.filter(card =>
-        card.name.toLowerCase() !== commanderName.toLowerCase()
-      );
+      commander_names.push(commanderName);
     }
+
+
+    other_cards = parsedCards.filter(card =>
+      !commander_names.includes(card.name)
+    );
+
+
+  } else {
+
+    other_cards = parsedCards;
+
   }
+
 
   const body = {
     commander_names,
@@ -207,10 +215,21 @@ export async function validateDeck(decklist, format = 'commander') {
     format
   };
 
+
   console.log(
-    'Mana Pool /deck request:',
+    "Mana Pool /deck REQUEST:",
     JSON.stringify(body, null, 2)
   );
 
-  return apiPost('/deck', body);
+
+  const result = await apiPost('/deck', body);
+
+
+  console.log(
+    "Mana Pool /deck RESPONSE:",
+    JSON.stringify(result, null, 2)
+  );
+
+
+  return result;
 }
